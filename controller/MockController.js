@@ -63,7 +63,18 @@ MockController.prototype = extend(MockController.prototype, {
 			timeout = parseInt(preferences.responseDelay);
 		}
 
-		responseFilePath = dir + 'mock/' + expectedResponse + '.json';
+		responseFilePath = dir + 'mock/' + expectedResponse + '.js';
+
+        // // Fallback to expectedResponse.json
+        if(!this.existFile(responseFilePath)){
+            responseFilePath = dir + 'mock/' + expectedResponse + '.json';
+        }
+
+        // // Fallback to success.js
+        if(!this.existFile(responseFilePath)){
+            expectedResponse = 'success';
+            responseFilePath = dir + 'mock/' + expectedResponse + '.js';
+        }
 
 		// Fallback to success.json
 		if (!this.existFile(responseFilePath)) {
@@ -71,7 +82,7 @@ MockController.prototype = extend(MockController.prototype, {
 			responseFilePath = dir + 'mock/success.json';
 			this.writeFile(dir + 'mock/response.txt', 'success');
 		}
-		
+
 		options = {
 			req: req,
 			res: res,
@@ -107,33 +118,52 @@ MockController.prototype = extend(MockController.prototype, {
 	 */
 	_sendSuccess: function (options) {
 
-		try {
-			var responseFile = this.readFile(options.responseFilePath),
-				responseData = this._getResponseData(options.req, options.method),
-				outStr;
+		if (options.responseFilePath.endsWith('.js')) {
+            try {
+                var dataProvider = require(options.responseFilePath),
+                    context = this._getResponseData(options.req, options.method);
+                context = extend(context, this._getFunc(this.options.funcPath));
+                context = extend(context, this._getDynamicPathParams(options));
 
-			try {
-				responseData = extend(responseData, this._getFunc(this.options.funcPath));
-				responseData = extend(responseData, this._getDynamicPathParams(options));
-				responseData = extend(responseData, this._getResponseFiles(options, responseData));
-				responseData = extend(responseData, {
-					require: require,
-					__dirname: this.options.dirName
-				});
-				outStr = ejs.render(responseFile, responseData);
-			} catch (err) {
-				log.log(err);
-			}
+                dataProvider(context, function (outStr) {
+                    options.res.send(outStr);
+                }, function (err) {
+                    log.log(err);
+                    options.res.end();
+                });
+            } catch (err) {
+                log.log(err);
+                options.res.end();
+            }
+        } else {
+            try {
+                var responseFile = this.readFile(options.responseFilePath),
+                    responseData = this._getResponseData(options.req, options.method),
+                    outStr;
 
-			if (outStr) {
-				options.res.send(outStr);
-			} else {
-				options.res.send(responseFile);
-			}
-		} catch (err) {
-			log.log(err);
-			options.res.end();
-		}
+                try {
+                    responseData = extend(responseData, this._getFunc(this.options.funcPath));
+                    responseData = extend(responseData, this._getDynamicPathParams(options));
+                    responseData = extend(responseData, this._getResponseFiles(options, responseData));
+                    responseData = extend(responseData, {
+                        require: require,
+                        __dirname: this.options.dirName
+                    });
+                    outStr = ejs.render(responseFile, responseData);
+                } catch (err) {
+                    log.log(err);
+                }
+
+                if (outStr) {
+                    options.res.send(outStr);
+                } else {
+                    options.res.send(responseFile);
+                }
+            } catch (err) {
+                log.log(err);
+                options.res.end();
+            }
+        }
 
 	},
 
