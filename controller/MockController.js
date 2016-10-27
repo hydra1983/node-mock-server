@@ -122,6 +122,7 @@ MockController.prototype = extend(MockController.prototype, {
             try {
                 var dataProvider = require(options.responseFilePath),
                     context = this._getResponseData(options.req, options.method);
+                context = extend(context, { options: options });
                 context = extend(context, this._getFunc(this.options.funcPath));
                 context = extend(context, this._getDynamicPathParams(options));
 
@@ -144,6 +145,7 @@ MockController.prototype = extend(MockController.prototype, {
                 try {
                     responseData = extend(responseData, this._getFunc(this.options.funcPath));
                     responseData = extend(responseData, this._getDynamicPathParams(options));
+                    responseData = extend(responseData, { options: options });
                     responseData = extend(responseData, this._getResponseFiles(options, responseData));
                     responseData = extend(responseData, {
                         require: require,
